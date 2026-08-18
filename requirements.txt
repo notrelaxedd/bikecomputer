@@ -1,0 +1,20 @@
+# Core display
+Pillow>=10.0
+numpy>=1.24
+spidev>=3.6
+RPi.GPIO>=0.7
+
+# GPS
+gpxpy>=1.6
+# gpsd client: install from apt or pip
+# sudo apt install python3-gps
+# or: pip install gpsd-py3
+
+# Map tiles
+mapbox-vector-tile>=2.0
+
+# Strava upload
+aiohttp>=3.9
+
+# Optional: faster route GPX parsing
+lxml>=5.0
