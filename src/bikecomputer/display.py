@@ -35,6 +35,7 @@ _CMD_COLMOD  = 0x3A   # Interface Pixel Format
 
 _INIT_SEQ = [
     # Positive/Negative Gamma Control
+    (_CMD_SLPOUT, None),                   # Sleep Out (needs 120 ms)
     (0xE0, bytes([0x00, 0x03, 0x09, 0x08, 0x16, 0x0A, 0x3F,
                   0x78, 0x4C, 0x09, 0x0A, 0x08, 0x16, 0x1A, 0x0F])),
     (0xE1, bytes([0x00, 0x16, 0x19, 0x03, 0x0F, 0x05, 0x32,
@@ -43,14 +44,13 @@ _INIT_SEQ = [
     (0xC1, bytes([0x41])),                 # Power Control 2
     (0xC5, bytes([0x00, 0x12, 0x80])),    # VCOM Control
     (_CMD_MADCTL, bytes([config.MADCTL])), # Orientation + BGR
-    (_CMD_COLMOD, bytes([0x55])),          # 16-bit RGB565
+    (_CMD_COLMOD, bytes([0x66])),
     (0xB0, bytes([0x00])),                 # Interface Mode Control
     (0xB1, bytes([0xA0])),                 # Frame Rate: 60 Hz
     (0xB4, bytes([0x02])),                 # Display Inversion: 2-dot
     (0xB6, bytes([0x02, 0x02, 0x3B])),    # Display Function Control
     (0xE9, bytes([0x00])),                 # Disable 24-bit data
     (0xF7, bytes([0xA9, 0x51, 0x2C, 0x82])),  # Adjust Control 3
-    (_CMD_SLPOUT, None),                   # Sleep Out (needs 120 ms)
     (_CMD_DISPON, None),                   # Display On
 ]
 
@@ -58,15 +58,8 @@ _SPI_CHUNK = 4096   # bytes per spidev write call
 
 
 def _image_to_bgr565(img: Image.Image) -> bytes:
-    """Convert a Pillow RGB image to BGR565 big-endian bytes."""
-    arr = np.asarray(img, dtype=np.uint16)
-    r = arr[:, :, 0]
-    g = arr[:, :, 1]
-    b = arr[:, :, 2]
-    # BGR565: B[15:11] G[10:5] R[4:0]
-    pixels = ((b >> 3) << 11) | ((g >> 2) << 5) | (r >> 3)
-    # ILI9488 expects MSB first over SPI
-    return pixels.astype(">u2").tobytes()
+    r, g, b = img.convert("RGB").split()
+    return Image.merge("RGB", (b, g, r)).tobytes()
 
 
 class Display:
@@ -148,25 +141,26 @@ class Display:
     def _dirty_write(self, raw: bytes) -> None:
         W = config.DISPLAY_WIDTH
         H = config.DISPLAY_HEIGHT
-
-        prev = np.frombuffer(self._prev_frame, dtype=np.uint16).reshape(H, W)
-        curr = np.frombuffer(raw, dtype=np.uint16).reshape(H, W)
-        diff = curr != prev
-
+        curr = np.frombuffer(raw, dtype=np.uint8).reshape(H, W, 3)
+        if self._prev_frame is None:
+            self._set_window(0, 0, W - 1, H - 1)
+            self._data(raw)
+            self._prev_frame = raw
+            return
+        prev = np.frombuffer(self._prev_frame, dtype=np.uint8).reshape(H, W, 3)
+        diff = np.any(curr != prev, axis=2)
         rows = np.any(diff, axis=1)
         cols = np.any(diff, axis=0)
-
         if not rows.any():
             return  # nothing changed
-
         y0 = int(np.argmax(rows))
         y1 = int(H - 1 - np.argmax(rows[::-1]))
         x0 = int(np.argmax(cols))
         x1 = int(W - 1 - np.argmax(cols[::-1]))
-
         region = curr[y0:y1 + 1, x0:x1 + 1]
         self._set_window(x0, y0, x1, y1)
-        self._data(region.astype(">u2").tobytes())
+        self._data(np.ascontiguousarray(region).tobytes())
+        self._prev_frame = raw
 
     def fill(self, colour: Tuple[int, int, int] = (0, 0, 0)) -> None:
         """Blank the display to a solid colour."""

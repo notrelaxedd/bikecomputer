@@ -56,7 +56,7 @@ def _ll_to_pixel(lat: float, lon: float, zoom: int, tx: int, ty: int, tile_px: i
 
 def _mvt_to_pixel(coords, ox: float, oy: float, scale: float):
     """Convert MVT geometry coordinates to pixel positions."""
-    return [(x * scale + ox, y * scale + oy) for x, y in coords]
+    return [(x * scale + ox, (_MVT_EXTENT - y) * scale + oy) for x, y in coords]
 
 
 class MapView:

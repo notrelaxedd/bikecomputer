@@ -18,7 +18,7 @@ RESET_PIN = 27   # Hardware reset
 
 # MADCTL byte: MV(0x20) | MX(0x40) | BGR(0x08) = landscape, BGR colour order.
 # If colours are inverted swap to 0x28; if image is mirrored try 0x68.
-MADCTL = 0x68
+MADCTL = 0x20
 
 # ── GPIO user button ────────────────────────────────────────────────────────
 BUTTON_PIN       = 17        # BCM; pulled-up, active-low
@@ -29,8 +29,8 @@ GPSD_HOST = "localhost"
 GPSD_PORT = 2947
 
 # ── GPS quality thresholds ──────────────────────────────────────────────────
-MIN_SATELLITES  = 4
-MAX_HDOP        = 5.0
+MIN_SATELLITES  = 0
+MAX_HDOP        = 999.0
 MAX_SPEED_MS    = 25.0        # reject fixes implying > 90 km/h
 AUTOPAUSE_MS    = 1.5         # m/s  (~5.4 km/h)
 
