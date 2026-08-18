@@ -38,8 +38,8 @@ class DetailScreen:
         rows = [
             ("ALTITUDE",       f"{state.altitude:.0f} m",
              "MAX ALT",        f"{state.max_altitude:.0f} m"),
-            ("AVG SPEED",      f"{state.avg_speed_kmh:.1f} km/h",
-             "MAX SPEED",      f"{state.max_speed_kmh:.1f} km/h"),
+            ("AVG SPEED",      f"{state.avg_speed_kmh:.1f} mph",
+             "MAX SPEED",      f"{state.max_speed_kmh:.1f} mph"),
             ("MOVING TIME",    RideState.format_duration(state.moving_time),
              "ELAPSED",        RideState.format_duration(state.elapsed_time)),
         ]

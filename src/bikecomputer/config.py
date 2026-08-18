@@ -35,8 +35,8 @@ MAX_SPEED_MS    = 25.0        # reject fixes implying > 90 km/h
 AUTOPAUSE_MS    = 1.5         # m/s  (~5.4 km/h)
 
 # ── Map / mbtiles ───────────────────────────────────────────────────────────
-MBTILES_PATH     = Path("/opt/bikecomputer/ohio.mbtiles")
-MAP_ZOOM         = 14         # tile zoom level for basemap
+MBTILES_PATH     = Path("/opt/bikecomputer/neohio.mbtiles")
+MAP_ZOOM         = 15         # tile zoom level for basemap
 TILE_CACHE_ROWS  = 3          # 3×3 tile cache
 MAP_FPS          = 2
 DATA_FPS         = 5

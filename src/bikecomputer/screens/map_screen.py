@@ -79,7 +79,7 @@ class MapScreen:
                      fill=config.CLR_POS_MARKER, outline=(0, 0, 0), width=2)
 
         # Speed overlay (bottom-left)
-        spd = f"{state.speed_kmh:.0f} km/h"
+        spd = f"{state.speed_kmh:.0f} mph"
         draw.rectangle([0, _H - 26, 100, _H], fill=(0, 0, 0, 180))
         draw.text((4, _H - 22), spd, font=self._font_sm, fill=config.CLR_TEXT)
 

@@ -139,19 +139,19 @@ class RideState:
 
     @property
     def speed_kmh(self) -> float:
-        return self.speed * 3.6
+        return self.speed * 2.23694
 
     @property
     def avg_speed_kmh(self) -> float:
-        return self.avg_speed * 3.6
+        return self.avg_speed * 2.23694
 
     @property
     def max_speed_kmh(self) -> float:
-        return self.max_speed * 3.6
+        return self.max_speed * 2.23694
 
     @property
     def distance_km(self) -> float:
-        return self.distance / 1000.0
+        return self.distance / 1609.34
 
     @staticmethod
     def format_duration(seconds: float) -> str:

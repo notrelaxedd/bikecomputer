@@ -51,7 +51,7 @@ class RideScreen:
         draw.text((_W // 2 - sw // 2, y_top), spd_txt,
                   font=self._font_huge, fill=config.CLR_TEXT)
 
-        unit_txt = "km/h"
+        unit_txt = "mph"
         bbox2 = draw.textbbox((0, 0), unit_txt, font=self._font_sm)
         uw = bbox2[2] - bbox2[0]
         draw.text((_W // 2 - uw // 2, y_top + 100), unit_txt,
@@ -64,10 +64,10 @@ class RideScreen:
         # ── Two-column stat grid ─────────────────────────────────────────
         col_w = _W // 2
         stats = [
-            ("DIST",    f"{state.distance_km:.2f} km"),
+            ("DIST",    f"{state.distance_km:.2f} mi"),
             ("TIME",    RideState.format_duration(state.moving_time)),
-            ("AVG",     f"{state.avg_speed_kmh:.1f} km/h"),
-            ("MAX",     f"{state.max_speed_kmh:.1f} km/h"),
+            ("AVG",     f"{state.avg_speed_kmh:.1f} mph"),
+            ("MAX",     f"{state.max_speed_kmh:.1f} mph"),
             ("HR",      "—"),
             ("CAD",     "—"),
         ]

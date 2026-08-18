@@ -70,7 +70,7 @@ class MapView:
         self._cache: dict[tuple[int, int, int], Image.Image] = {}  # (z, tx, ty) → Image
         self._route_pixels: list[tuple[int, int]] = []   # lat/lon pairs of route
         self._cue_points: list[tuple[float, float]] = [] # (lat, lon) of heading changes
-        self._tile_px = 256
+        self._tile_px = 512
 
         self._open_db()
         self._load_route()
