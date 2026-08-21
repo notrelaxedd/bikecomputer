@@ -310,7 +310,17 @@ class BluetoothManager:
         return self._adapter_path + "/dev_" + address.upper().replace(":", "_")
 
     async def pair(self, address: str) -> tuple[bool, str]:
-        """Pair, trust, and connect in one step — that is always the intent."""
+        """
+        Pair, trust, and connect in one step — that is always the intent.
+
+        Pairing is best-effort, and a failure here is not fatal.  Plenty of
+        BLE sensors (heart-rate straps especially) expose their GATT
+        services without bonding at all, and BlueZ's Pair() answers
+        AuthenticationFailed or NotSupported for them while a plain
+        Connect() works perfectly.  The connection is therefore the
+        verdict; the pairing error is only reported if the connect fails
+        too, since that is when it actually explains something.
+        """
         if not self.available:
             return False, "Bluetooth unavailable"
         try:
@@ -318,16 +328,20 @@ class BluetoothManager:
         except Exception:
             return False, "Device not found"
 
+        pair_error = ""
         try:
             if not await dev.get_paired():
                 await asyncio.wait_for(dev.call_pair(),
                                        timeout=config.BT_CONNECT_TIMEOUT)
         except asyncio.TimeoutError:
-            return False, "Pairing timed out"
+            pair_error = "Pairing timed out"
         except Exception as exc:
             msg = _short(exc)
             if "AlreadyExists" not in msg:
-                return False, msg
+                pair_error = msg
+        if pair_error:
+            log.info("Pair() failed for %s (%s) - trying to connect anyway",
+                     address, pair_error)
 
         # Trusting is what lets the device reconnect on its own later.
         try:
@@ -335,7 +349,10 @@ class BluetoothManager:
         except Exception as exc:
             log.debug("Could not trust %s: %s", address, exc)
 
-        return await self.connect(address)
+        ok, message = await self.connect(address)
+        if ok:
+            return True, message
+        return False, pair_error or message
 
     async def connect(self, address: str) -> tuple[bool, str]:
         if not self.available:
