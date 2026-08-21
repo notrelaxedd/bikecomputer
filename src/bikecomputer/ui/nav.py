@@ -169,22 +169,26 @@ class Navigator:
             await self._pop()
             return
 
+        # Navigation itself is inside the guard, not just the view's
+        # handler.  Pushing a view runs its on_show(), and an exception
+        # escaping here would propagate out of the button task and take
+        # down the gather that owns the render loop with it -- leaving a
+        # frozen screen and no way back short of a restart.
         view = self.active
         try:
             result = await view.handle(event, self._ctx)
+
+            if result is HANDLED:
+                return
+            if result is not None:
+                await self._apply(result)
+                return
+
+            await self._default(event)
         except Exception as exc:
             log.error("View %s failed handling %s: %s",
                       type(view).__name__, event, exc, exc_info=True)
             self._ctx.toast("Something went wrong")
-            return
-
-        if result is HANDLED:
-            return
-        if result is not None:
-            await self._apply(result)
-            return
-
-        await self._default(event)
 
     async def _apply(self, action: Action) -> None:
         if isinstance(action, Push):

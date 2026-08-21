@@ -193,6 +193,25 @@ class TestNavigator:
         run(nav.dispatch(ButtonEvent(Button.DOWN, Press.SHORT)))
         assert nav.in_menu
 
+    def test_menu_that_throws_on_open_does_not_kill_the_app(self):
+        """
+        Opening the menu runs the new view's on_show inside dispatch. If
+        that escaped, it would propagate out of the button task and take
+        the render loop down with it -- a frozen screen needing a restart.
+        """
+        class Exploding(View):
+            async def on_show(self, ctx):
+                raise RuntimeError("boom")
+
+            def render(self, ctx):
+                raise AssertionError
+
+        nav, ctx = make_nav()
+        run(nav.start())
+        nav.set_menu_factory(Exploding)
+        run(nav.dispatch(ButtonEvent(Button.SELECT, Press.LONG)))
+        assert ctx.active_toast
+
     def test_view_exception_does_not_propagate(self):
         class Exploding(View):
             async def handle(self, event, ctx):

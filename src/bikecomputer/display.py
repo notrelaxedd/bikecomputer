@@ -118,6 +118,17 @@ class Display:
         self._data(struct.pack(">HH", y0, y1))
         self._cmd(_CMD_RAMWR)
 
+    def invalidate(self) -> None:
+        """
+        Force the next blit to be a full write.
+
+        Dirty-rectangle updates assume the panel's contents match
+        _prev_frame.  If a write dies partway through, that assumption is
+        wrong for every later frame and the display can never repaint
+        itself -- so any failed blit has to drop the cache.
+        """
+        self._prev_frame = None
+
     def set_madctl(self, value: int) -> None:
         """
         Change orientation at runtime.

@@ -218,6 +218,10 @@ class BikeComputer:
                 self._display.blit(self._nav.render())
             except Exception as exc:
                 log.error("Render error: %s", exc, exc_info=True)
+                # The panel may hold a half-written frame, so the cached
+                # baseline is no longer trustworthy. Repaint everything
+                # next time rather than diffing against a lie.
+                self._display.invalidate()
 
             elapsed = time.monotonic() - started
             await asyncio.sleep(max(0.0, frame_time - elapsed))
