@@ -178,9 +178,36 @@ class Display:
 
         self._prev_frame = raw
 
+    def _write_region(self, arr, x0: int, y0: int, x1: int, y1: int) -> None:
+        """
+        Send a rectangle as horizontal bands, each one a complete
+        CASET/RASET/RAMWR sequence whose pixel data fits in a single SPI
+        transfer.
+
+        This matters because spidev releases CS at the end of every call,
+        and the ILI9488 treats CS going high as ending the memory write.
+        A payload large enough to be split therefore loses everything
+        after the first chunk -- the panel keeps whatever was there, and
+        because dirty-rectangle logic then believes the frame was
+        delivered, it never repaints. Banding keeps each write atomic, so
+        the split happens between commands rather than inside one.
+        """
+        width = x1 - x0 + 1
+        row_bytes = width * 3
+        rows_per_band = max(1, _SPI_CHUNK // row_bytes)
+
+        for band_y0 in range(y0, y1 + 1, rows_per_band):
+            band_y1 = min(band_y0 + rows_per_band - 1, y1)
+            self._set_window(x0, band_y0, x1, band_y1)
+            band = arr[band_y0:band_y1 + 1, x0:x1 + 1]
+            GPIO.output(config.DC_PIN, GPIO.HIGH)
+            self._spi.writebytes2(np.ascontiguousarray(band).tobytes())
+
     def _full_write(self, raw: bytes) -> None:
-        self._set_window(0, 0, config.DISPLAY_WIDTH - 1, config.DISPLAY_HEIGHT - 1)
-        self._data(raw)
+        arr = np.frombuffer(raw, dtype=np.uint8).reshape(
+            config.DISPLAY_HEIGHT, config.DISPLAY_WIDTH, 3)
+        self._write_region(arr, 0, 0,
+                           config.DISPLAY_WIDTH - 1, config.DISPLAY_HEIGHT - 1)
         self._last_full = time.monotonic()
 
     def _dirty_write(self, raw: bytes) -> None:
@@ -215,9 +242,7 @@ class Display:
             self._prev_frame = raw
             return
 
-        region = curr[y0:y1 + 1, x0:x1 + 1]
-        self._set_window(x0, y0, x1, y1)
-        self._data(np.ascontiguousarray(region).tobytes())
+        self._write_region(curr, x0, y0, x1, y1)
         self._prev_frame = raw
 
     def fill(self, colour: Tuple[int, int, int] = (0, 0, 0)) -> None:

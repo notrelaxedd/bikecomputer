@@ -144,3 +144,34 @@ class TestRepaintPolicy:
         panel._spi.writes.clear()
         panel.blit(img)
         assert _bytes_written(panel) == FULL_BYTES
+
+
+class TestAtomicWrites:
+    """
+    spidev releases CS at the end of every call, and the ILI9488 treats
+    that as ending the memory write. So a RAMWR must never span more than
+    one transfer: anything past the first chunk would be dropped, and the
+    driver would carry on believing the frame had been delivered.
+    """
+
+    def test_no_payload_exceeds_the_chunk_size(self, panel):
+        panel.blit(_frame((255, 255, 255)))
+        oversized = [len(w) for w in panel._spi.writes
+                     if len(w) > display_mod._SPI_CHUNK]
+        assert oversized == []
+
+    def test_full_frame_still_sends_every_pixel(self, panel):
+        panel.blit(_frame((7, 8, 9)))
+        assert _bytes_written(panel) == FULL_BYTES
+
+    def test_each_band_is_preceded_by_a_window_command(self, panel):
+        """Every pixel payload needs its own CASET/RASET/RAMWR in front."""
+        panel.blit(_frame((1, 2, 3)))
+        writes = panel._spi.writes
+
+        payloads = [i for i, w in enumerate(writes) if len(w) > 4]
+        for index in payloads:
+            preceding = writes[max(0, index - 6):index]
+            assert bytes([display_mod._CMD_RAMWR]) in preceding, (
+                "pixel data sent without a fresh RAMWR before it"
+            )
