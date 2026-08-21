@@ -90,6 +90,7 @@ class LocalPlayer:
         self._reply_id = 0
         self._pending: dict[int, asyncio.Future] = {}
         self._read_task: Optional[asyncio.Task] = None
+        self._err_task: Optional[asyncio.Task] = None
 
     @property
     def available(self) -> bool:
@@ -128,7 +129,10 @@ class LocalPlayer:
             "--idle=yes",
             "--no-video",
             "--no-terminal",
-            "--really-quiet",
+            # Not --really-quiet: mpv reports audio-device failures on
+            # stderr, and discarding them turns "no sound" into a silent
+            # mystery. Warnings and errors only, drained into our log.
+            "--msg-level=all=warn",
             "--gapless-audio=yes",
             "--audio-display=no",
             f"--volume={self._volume}",
@@ -138,7 +142,7 @@ class LocalPlayer:
             self._proc = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.PIPE,
             )
         except OSError as exc:
             self.error = f"mpv failed: {exc}"
@@ -150,8 +154,27 @@ class LocalPlayer:
             return False
 
         self._read_task = asyncio.create_task(self._read_loop(), name="mpv-ipc")
+        self._err_task = asyncio.create_task(self._drain_stderr(), name="mpv-err")
         log.info("mpv ready, %d tracks in library", len(self.tracks))
         return True
+
+    async def _drain_stderr(self) -> None:
+        """Surface mpv's own complaints; it knows why it is not playing."""
+        proc = self._proc
+        if proc is None or proc.stderr is None:
+            return
+        while True:
+            try:
+                line = await proc.stderr.readline()
+            except (asyncio.CancelledError, ValueError):
+                raise
+            except Exception:
+                return
+            if not line:
+                return
+            text = line.decode("utf-8", errors="replace").strip()
+            if text:
+                log.warning("mpv: %s", text)
 
     async def _connect_socket(self, attempts: int = 25) -> bool:
         """mpv creates the socket a moment after exec, so poll for it."""
@@ -166,9 +189,11 @@ class LocalPlayer:
         return False
 
     async def stop(self) -> None:
-        if self._read_task:
-            self._read_task.cancel()
-            self._read_task = None
+        for task in (self._read_task, self._err_task):
+            if task:
+                task.cancel()
+        self._read_task = None
+        self._err_task = None
         if self._writer:
             try:
                 self._writer.close()
