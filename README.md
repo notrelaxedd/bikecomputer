@@ -34,9 +34,9 @@ Menu
 |-----------|------|
 | GPIO 25   | Display DC (Data/Command) |
 | GPIO 27   | Display RST (Reset) |
-| GPIO 17   | Button UP |
+| GPIO 6    | Button UP |
 | GPIO 5    | Button SELECT |
-| GPIO 6    | Button DOWN |
+| GPIO 17   | Button DOWN |
 | SPI0 CS0  | Display CS (CE0) |
 | SPI0 MOSI | Display MOSI |
 | SPI0 CLK  | Display SCK |

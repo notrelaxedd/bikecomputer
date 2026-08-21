@@ -47,9 +47,9 @@ MADCTL = 0x40
 #   DOWN   — move down a list / next screen
 #
 # Pins avoid SPI (7-11), the display's DC/RST (25/27) and the GPS UART (14/15).
-BUTTON_UP_PIN     = 17
+BUTTON_UP_PIN     = 6
 BUTTON_SELECT_PIN = 5
-BUTTON_DOWN_PIN   = 6
+BUTTON_DOWN_PIN   = 17
 
 BUTTON_DEBOUNCE     = 0.04   # seconds; edges closer together are ignored
 BUTTON_LONG_PRESS   = 0.6    # seconds held before a press counts as "long"
