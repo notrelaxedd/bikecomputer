@@ -15,7 +15,12 @@ dependencies = [
     "gpxpy>=1.6",
     "mapbox-vector-tile>=2.0",
     "aiohttp>=3.9",
+    "dbus-fast>=2.21",
+    "mutagen>=1.47",
 ]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
 
 [project.scripts]
 bikecomputer = "bikecomputer.app:main"

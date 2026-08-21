@@ -1,7 +1,7 @@
 [Unit]
 Description=Bike Computer
-After=network.target gpsd.service
-Wants=gpsd.service
+After=network.target sound.target gpsd.service bluetooth.service
+Wants=gpsd.service bluetooth.service
 
 [Service]
 Type=simple
@@ -17,16 +17,20 @@ WorkingDirectory=/opt/bikecomputer
 #   Environment="STRAVA_CLIENT_SECRET=your_secret_here"
 EnvironmentFile=-/etc/bikecomputer/env
 
+# mpv and librespot talk to PipeWire over the user session bus, which
+# only exists if the user has a running session bus address.
+Environment="XDG_RUNTIME_DIR=/run/user/1000"
+
 ExecStart=/opt/bikecomputer/venv/bin/python -m bikecomputer.app
 
 Restart=always
 RestartSec=5
 
-# Allow GPIO and SPI access
-SupplementaryGroups=gpio spi
+# Allow GPIO, SPI, audio and Bluetooth access
+SupplementaryGroups=gpio spi audio bluetooth
 
-# Write access for ride files
-ReadWritePaths=/var/bikecomputer
+# Write access for ride files, settings, music and the mpv IPC socket
+ReadWritePaths=/var/bikecomputer /tmp
 
 StandardOutput=journal
 StandardError=journal

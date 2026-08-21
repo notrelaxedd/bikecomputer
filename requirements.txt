@@ -13,8 +13,14 @@ gpxpy>=1.6
 # Map tiles
 mapbox-vector-tile>=2.0
 
-# Strava upload
+# Bluetooth (BlueZ over D-Bus): pairing, plus BLE heart rate and cadence
+dbus-fast>=2.21
+
+# Strava upload and the Spotify Web API
 aiohttp>=3.9
+
+# Music metadata for the local library (falls back to filenames without it)
+mutagen>=1.47
 
 # Optional: faster route GPX parsing
 lxml>=5.0

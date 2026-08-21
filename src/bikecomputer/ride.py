@@ -5,7 +5,6 @@ No I/O; safe to unit-test without hardware.
 
 from __future__ import annotations
 import math
-import time
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -63,6 +62,14 @@ class RideState:
     satellites: int = 0
     hdop: float = 99.9
     has_fix: bool = False
+
+    # BLE sensors (None = no sensor, or reading has gone stale).
+    # sensors.SensorHub writes these; the *_updated stamps are
+    # time.monotonic() and are what the staleness check compares against.
+    heart_rate: Optional[int] = None
+    cadence: Optional[int] = None
+    hr_updated: float = 0.0
+    cadence_updated: float = 0.0
 
     # Accumulated stats
     distance: float = 0.0       # m
@@ -137,21 +144,20 @@ class RideState:
     def paused(self) -> bool:
         return self._paused
 
-    @property
-    def speed_kmh(self) -> float:
-        return self.speed * 2.23694
+    def reset(self) -> None:
+        """Clear the trip counters without discarding the current position."""
+        self.distance = 0.0
+        self.moving_time = 0.0
+        self.elapsed_time = 0.0
+        self.avg_speed = 0.0
+        self.max_speed = 0.0
+        self.max_altitude = self.altitude
+        self._ride_start = None
+        self._last_update = None
 
-    @property
-    def avg_speed_kmh(self) -> float:
-        return self.avg_speed * 2.23694
-
-    @property
-    def max_speed_kmh(self) -> float:
-        return self.max_speed * 2.23694
-
-    @property
-    def distance_km(self) -> float:
-        return self.distance / 1609.34
+    # Speed and distance stay in SI here.  Conversion to mph/mi (or km/h/km)
+    # happens at render time in units.py, so logged GPX and Strava uploads
+    # are never affected by the display preference.
 
     @staticmethod
     def format_duration(seconds: float) -> str:
