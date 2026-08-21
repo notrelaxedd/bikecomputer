@@ -118,9 +118,22 @@ class Display:
         self._data(struct.pack(">HH", y0, y1))
         self._cmd(_CMD_RAMWR)
 
+    def set_madctl(self, value: int) -> None:
+        """
+        Change orientation at runtime.
+
+        Used by tools/orientation.py to cycle through the candidates without
+        an edit-and-restart for each one.  The cached frame is dropped
+        because the previous contents no longer describe what is on the
+        panel, so the next blit must be a full write.
+        """
+        self._cmd(_CMD_MADCTL)
+        self._data(bytes([value]))
+        self._prev_frame = None
+
     def blit(self, img: Image.Image) -> None:
         """
-        Write a full 480×320 Pillow image to the display.
+        Write a full 320×480 Pillow image to the display.
         Computes a dirty bounding box against the previous frame and only
         transmits the changed rectangle.
         """
