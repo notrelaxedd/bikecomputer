@@ -54,7 +54,26 @@ _INIT_SEQ = [
     (_CMD_DISPON, None),                   # Display On
 ]
 
-_SPI_CHUNK = 4096   # bytes per spidev write call
+# Bytes per spidev write call.  Each call asserts and releases CS, and a
+# full-screen update is ~460 kB, so a small chunk means over a hundred CS
+# toggles inside a single RAMWR -- which some ILI9488 panels treat as
+# terminating the write.  Fewer, larger chunks means fewer chances to
+# desync.  Requires spidev bufsiz to match; see README step 5.
+_SPI_CHUNK = 65536
+
+# Force a full repaint at least this often.  Dirty-rectangle writes are an
+# optimisation built on the assumption that the panel matches _prev_frame,
+# and nothing in the protocol lets us verify that -- there is no read-back.
+# If the panel ever loses a write, the software would happily send nothing
+# for the rest of the session, since as far as it knows the frame is
+# already correct. A periodic unconditional repaint bounds how long any
+# such desync can last.
+_FULL_REFRESH_INTERVAL = 4.0   # seconds
+
+# Above this fraction of changed pixels, skip the bounding-box arithmetic
+# and just repaint everything: the saving no longer justifies the risk of
+# drifting out of sync.
+_FULL_REFRESH_AREA = 0.6
 
 
 def _image_to_bgr565(img: Image.Image) -> bytes:
@@ -66,6 +85,7 @@ class Display:
     def __init__(self) -> None:
         self._spi = spidev.SpiDev()
         self._prev_frame: bytes | None = None
+        self._last_full = 0.0
 
     def init(self) -> None:
         """Open SPI, configure GPIO, send ILI9488 init sequence."""
@@ -161,6 +181,7 @@ class Display:
     def _full_write(self, raw: bytes) -> None:
         self._set_window(0, 0, config.DISPLAY_WIDTH - 1, config.DISPLAY_HEIGHT - 1)
         self._data(raw)
+        self._last_full = time.monotonic()
 
     def _dirty_write(self, raw: bytes) -> None:
         W = config.DISPLAY_WIDTH
@@ -175,12 +196,25 @@ class Display:
         diff = np.any(curr != prev, axis=2)
         rows = np.any(diff, axis=1)
         cols = np.any(diff, axis=0)
+
+        stale = time.monotonic() - self._last_full > _FULL_REFRESH_INTERVAL
         if not rows.any():
-            return  # nothing changed
+            if stale:
+                self._full_write(raw)   # heal a desync we cannot detect
+                self._prev_frame = raw
+            return
+
         y0 = int(np.argmax(rows))
         y1 = int(H - 1 - np.argmax(rows[::-1]))
         x0 = int(np.argmax(cols))
         x1 = int(W - 1 - np.argmax(cols[::-1]))
+
+        area = (y1 - y0 + 1) * (x1 - x0 + 1) / float(W * H)
+        if stale or area > _FULL_REFRESH_AREA:
+            self._full_write(raw)
+            self._prev_frame = raw
+            return
+
         region = curr[y0:y1 + 1, x0:x1 + 1]
         self._set_window(x0, y0, x1, y1)
         self._data(np.ascontiguousarray(region).tobytes())

@@ -277,8 +277,14 @@ class BikeComputer:
 
 
 def main() -> None:
+    # Button presses log at DEBUG, so at the default level a dead button
+    # and a working one look identical from the logs. BIKECOMPUTER_LOG
+    # exists to tell those apart without editing code on the bike:
+    #   BIKECOMPUTER_LOG=DEBUG venv/bin/python -m bikecomputer.app
+    import os
+    level = os.environ.get("BIKECOMPUTER_LOG", "INFO").upper()
     logging.basicConfig(
-        level=logging.INFO,
+        level=getattr(logging, level, logging.INFO),
         format="%(asctime)s %(name)s %(levelname)s %(message)s",
     )
     asyncio.run(BikeComputer().run())
