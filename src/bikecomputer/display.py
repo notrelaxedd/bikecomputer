@@ -178,6 +178,43 @@ class Display:
 
         self._prev_frame = raw
 
+    def _reassert_state(self) -> None:
+        """
+        Re-send the registers that determine how pixel data is interpreted.
+
+        If the controller browns out during a heavy SPI burst it silently
+        resets: back to sleep mode, default pixel format, default
+        orientation. Every frame we push after that is discarded, and
+        because nothing in the driver ever re-ran the init sequence, the
+        panel stayed white until the process restarted.
+
+        These four commands are about ten bytes and are no-ops on a
+        healthy panel, so paying them on each full repaint costs nothing
+        and makes a controller reset self-healing within one refresh
+        cycle. SLPOUT normally wants 120 ms afterwards; that delay is
+        skipped deliberately rather than stuttering the UI every time --
+        a frame lost immediately after a wake is picked up by the next
+        refresh.
+        """
+        self._cmd(_CMD_SLPOUT)
+        self._cmd(_CMD_MADCTL)
+        self._data(bytes([config.MADCTL]))
+        self._cmd(_CMD_COLMOD)
+        self._data(bytes([0x66]))
+        self._cmd(_CMD_DISPON)
+
+    def reinit(self) -> None:
+        """Full hardware reset and re-init, for recovering a wedged panel."""
+        log.warning("Re-initialising display")
+        self._reset()
+        for cmd, data in _INIT_SEQ:
+            self._cmd(cmd)
+            if data:
+                self._data(data)
+            if cmd == _CMD_SLPOUT:
+                time.sleep(0.12)
+        self._prev_frame = None
+
     def _write_region(self, arr, x0: int, y0: int, x1: int, y1: int) -> None:
         """
         Send a rectangle as horizontal bands, each one a complete
@@ -204,6 +241,9 @@ class Display:
             self._spi.writebytes2(np.ascontiguousarray(band).tobytes())
 
     def _full_write(self, raw: bytes) -> None:
+        # Cheap insurance: if the controller reset since the last frame,
+        # this is what makes the repaint below actually land.
+        self._reassert_state()
         arr = np.frombuffer(raw, dtype=np.uint8).reshape(
             config.DISPLAY_HEIGHT, config.DISPLAY_WIDTH, 3)
         self._write_region(arr, 0, 0,

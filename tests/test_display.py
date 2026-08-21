@@ -175,3 +175,43 @@ class TestAtomicWrites:
             assert bytes([display_mod._CMD_RAMWR]) in preceding, (
                 "pixel data sent without a fresh RAMWR before it"
             )
+
+
+class TestControllerRecovery:
+    """
+    A brown-out silently resets the controller: sleep mode, default pixel
+    format, default orientation. Pixels pushed afterwards are discarded,
+    so a repaint alone cannot recover -- the configuration has to be
+    re-sent too.
+    """
+
+    def _commands(self, panel):
+        return [w[0] for w in panel._spi.writes if len(w) == 1]
+
+    def test_full_repaint_reasserts_pixel_format_and_orientation(self, panel):
+        panel.blit(_frame((5, 5, 5)))
+        sent = self._commands(panel)
+        for cmd in (display_mod._CMD_SLPOUT, display_mod._CMD_MADCTL,
+                    display_mod._CMD_COLMOD, display_mod._CMD_DISPON):
+            assert cmd in sent
+
+    def test_partial_update_skips_the_reassert(self, panel):
+        """Small updates are the common case and must stay cheap."""
+        panel.blit(_frame())
+        panel._spi.writes.clear()
+
+        changed = _frame()
+        for x in range(10, 30):
+            for y in range(10, 20):
+                changed.putpixel((x, y), (255, 255, 255))
+        panel.blit(changed)
+
+        assert display_mod._CMD_DISPON not in self._commands(panel)
+
+    def test_reinit_replays_the_whole_sequence(self, panel):
+        panel._spi.writes.clear()
+        panel.reinit()
+        sent = self._commands(panel)
+        assert display_mod._CMD_SLPOUT in sent
+        assert display_mod._CMD_DISPON in sent
+        assert panel._prev_frame is None
