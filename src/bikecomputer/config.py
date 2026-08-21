@@ -24,13 +24,19 @@ RESET_PIN = 27   # Hardware reset
 
 # MADCTL byte. Bits: MY=0x80 MX=0x40 MV=0x20 ML=0x10 BGR=0x08 MH=0x04.
 # MV (row/column exchange) is what selects landscape, so portrait clears it.
-#   0x00 → portrait
-#   0x40 → portrait, mirrored horizontally
-#   0x80 → portrait, mirrored vertically
-#   0xC0 → portrait, rotated 180°   (use this if the buttons end up at the top)
-# Colour order is corrected in software (display._image_to_bgr888), so
+#
+# 0x40 (MX) is correct for the panel this was built against, confirmed by
+# eye with tools/orientation.py.  Do not try to derive this value -- whether
+# a setting comes out rotated or mirrored depends on how the glass is bonded
+# to the controller, which is not in the datasheet.  On this module the
+# bonding is mirrored, so the value that looks "wrong" on paper is right.
+#
+# If you swap panels, run the tool again; the four portrait candidates are
+# 0x00, 0x40, 0x80 and 0xC0.
+#
+# Colour order is corrected in software (display._image_to_bgr565), so
 # leave the BGR bit clear.
-MADCTL = 0x00
+MADCTL = 0x40
 
 # ── GPIO buttons ────────────────────────────────────────────────────────────
 # Three momentary buttons, each wired between the GPIO and GND.

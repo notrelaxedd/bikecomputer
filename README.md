@@ -107,18 +107,27 @@ sudo reboot
 
 ### 6. Display orientation
 
-The panel is driven in portrait (320×480). If the image is upside-down or
-mirrored, change `MADCTL` in `src/bikecomputer/config.py`:
+The panel is driven in portrait (320×480), with `MADCTL = 0x40` in
+`src/bikecomputer/config.py`.
 
-| MADCTL | Effect |
-|--------|--------|
-| `0x00` | Portrait (default) |
-| `0x40` | Portrait, mirrored horizontally |
-| `0x80` | Portrait, mirrored vertically |
-| `0xC0` | Portrait, rotated 180° |
+Do not try to derive this value arithmetically. Whether a given setting comes
+out rotated or mirrored depends on how the glass is bonded to the controller,
+which is not in the datasheet — on this module the bonding is mirrored, so the
+value that looks wrong on paper is the correct one. If you change panels, ask
+the hardware instead:
 
-Setting the `MV` bit (`0x20`) puts it back in landscape, which the UI is no
-longer laid out for.
+```bash
+sudo systemctl stop bikecomputer
+venv/bin/python tools/orientation.py
+```
+
+It cycles the four portrait candidates (`0x00`, `0x40`, `0x80`, `0xC0`) and
+shows a test pattern built around a letter F — the one glyph where "upside
+down" and "mirrored" can't be mistaken for each other. Pick the value where the
+F reads normally, the red **TL** block is top-left, and the arrow points up.
+
+Setting the `MV` bit (`0x20`) returns to landscape, which the UI is no longer
+laid out for.
 
 ## Music
 
