@@ -180,28 +180,27 @@ class Display:
 
     def _reassert_state(self) -> None:
         """
-        Re-send the registers that determine how pixel data is interpreted.
+        Replay the whole init sequence, minus the reset pin and the delays.
 
-        If the controller browns out during a heavy SPI burst it silently
-        resets: back to sleep mode, default pixel format, default
-        orientation. Every frame we push after that is discarded, and
-        because nothing in the driver ever re-ran the init sequence, the
-        panel stayed white until the process restarted.
+        A brown-out resets the controller silently: sleep mode, default
+        pixel format and orientation, and default power/VCOM/gamma. There
+        is no way to notice -- SPI offers no read-back here -- so every
+        frame after that is discarded and the panel stays white.
 
-        These four commands are about ten bytes and are no-ops on a
-        healthy panel, so paying them on each full repaint costs nothing
-        and makes a controller reset self-healing within one refresh
-        cycle. SLPOUT normally wants 120 ms afterwards; that delay is
-        skipped deliberately rather than stuttering the UI every time --
-        a frame lost immediately after a wake is picked up by the next
-        refresh.
+        Re-sending the configuration is about sixty bytes and every
+        command is idempotent, so paying it on each full repaint costs
+        nothing on a healthy panel and makes a reset self-healing.
+
+        The 120 ms SLPOUT settling time is deliberately skipped rather
+        than stalling the UI on every repaint. A frame sent immediately
+        after a genuine wake may be discarded; the next refresh, a few
+        seconds later, lands. Recovering in seconds without a restart is
+        the goal, not recovering on the very first attempt.
         """
-        self._cmd(_CMD_SLPOUT)
-        self._cmd(_CMD_MADCTL)
-        self._data(bytes([config.MADCTL]))
-        self._cmd(_CMD_COLMOD)
-        self._data(bytes([0x66]))
-        self._cmd(_CMD_DISPON)
+        for cmd, data in _INIT_SEQ:
+            self._cmd(cmd)
+            if data:
+                self._data(data)
 
     def reinit(self) -> None:
         """Full hardware reset and re-init, for recovering a wedged panel."""

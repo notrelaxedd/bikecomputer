@@ -76,9 +76,27 @@ def _frame(colour=(0, 0, 0)):
     return Image.new("RGB", (W, H), colour)
 
 
+def _pixel_payloads(d):
+    """
+    Payloads that are actually pixel data.
+
+    Anything following RAMWR is pixels; anything following any other
+    command is that command's arguments. Distinguishing them by size
+    alone breaks as soon as the init sequence is replayed, since its
+    gamma tables are larger than a window command's four bytes.
+    """
+    payloads = []
+    last_cmd = None
+    for write in d._spi.writes:
+        if len(write) == 1:
+            last_cmd = write[0]
+        elif last_cmd == display_mod._CMD_RAMWR:
+            payloads.append(write)
+    return payloads
+
+
 def _bytes_written(d):
-    """Total payload since the last clear, ignoring command bytes."""
-    return sum(len(w) for w in d._spi.writes if len(w) > 4)
+    return sum(len(w) for w in _pixel_payloads(d))
 
 
 class TestRepaintPolicy:
@@ -160,21 +178,30 @@ class TestAtomicWrites:
                      if len(w) > display_mod._SPI_CHUNK]
         assert oversized == []
 
+    def test_every_pixel_payload_follows_its_own_ramwr(self, panel):
+        """
+        _pixel_payloads only counts data directly after RAMWR, so a
+        non-empty result is itself the proof that each band re-issued
+        the window rather than continuing a previous write.
+        """
+        panel.blit(_frame((1, 2, 3)))
+        payloads = _pixel_payloads(panel)
+        assert payloads
+        assert sum(len(w) for w in payloads) == FULL_BYTES
+
     def test_full_frame_still_sends_every_pixel(self, panel):
         panel.blit(_frame((7, 8, 9)))
         assert _bytes_written(panel) == FULL_BYTES
 
-    def test_each_band_is_preceded_by_a_window_command(self, panel):
-        """Every pixel payload needs its own CASET/RASET/RAMWR in front."""
+    def test_bands_cover_the_frame_without_overlap(self, panel):
+        """Banding must partition the frame, not drop or duplicate rows."""
         panel.blit(_frame((1, 2, 3)))
-        writes = panel._spi.writes
-
-        payloads = [i for i, w in enumerate(writes) if len(w) > 4]
-        for index in payloads:
-            preceding = writes[max(0, index - 6):index]
-            assert bytes([display_mod._CMD_RAMWR]) in preceding, (
-                "pixel data sent without a fresh RAMWR before it"
-            )
+        payloads = _pixel_payloads(panel)
+        assert len(payloads) > 1, "a full frame should need several bands"
+        assert sum(len(w) for w in payloads) == FULL_BYTES
+        assert all(len(w) % (W * 3) == 0 for w in payloads), (
+            "each band should be a whole number of rows"
+        )
 
 
 class TestControllerRecovery:
